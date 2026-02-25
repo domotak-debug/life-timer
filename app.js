@@ -202,35 +202,68 @@ function calcRemaining(birth, targetAge) {
 const r = calcRemaining(BIRTH, TARGET_AGE);
 const pct = (r.ratio * 100).toFixed(2);
 
-// ===== ドーナツグラフ: SVG文字列をbase64でImage化 =====
-function drawDonutSVG(remaining, size) {
+// ===== DrawContext でドーナツグラフを描画 =====
+// Scriptable は Path.addArc / SVG 非対応のため
+// 細かい線分を並べてリング状の円を描く
+function drawDonut(remaining, size) {
+  const dc = new DrawContext();
+  dc.size = new Size(size, size);
+  dc.opaque = false;
+  dc.respectScreenScale = true;
+
   const cx = size / 2;
   const cy = size / 2;
-  const radius = size * 0.38;
-  const strokeW = size * 0.14;
-  const circ = 2 * Math.PI * radius;
-  const elapsed = 1 - remaining;
-  const dashElapsed = circ * elapsed;
-  const dashRemain  = circ * remaining;
+  const R  = size * 0.38;   // 円の半径
+  const lw = size * 0.12;   // 線の太さ
+  const STEPS = 120;        // 分割数（多いほど滑らか）
+  const elapsed = 1 - remaining; // 経過割合
 
-  const svg = \`<svg xmlns="http://www.w3.org/2000/svg" width="\${size}" height="\${size}">
-  <circle cx="\${cx}" cy="\${cy}" r="\${radius}"
-    fill="none" stroke="#2a2a4a" stroke-width="\${strokeW}"/>
-  <circle cx="\${cx}" cy="\${cy}" r="\${radius}"
-    fill="none" stroke="#ff6b00" stroke-width="\${strokeW}"
-    stroke-dasharray="\${dashElapsed} \${dashRemain}"
-    stroke-dashoffset="\${circ * 0.25}"
-    stroke-linecap="round"/>
-  <text x="\${cx}" y="\${cy - size*0.04}" text-anchor="middle"
-    font-family="-apple-system,sans-serif" font-weight="bold"
-    font-size="\${size*0.17}" fill="#ffffff">\${(remaining*100).toFixed(1)}%</text>
-  <text x="\${cx}" y="\${cy + size*0.13}" text-anchor="middle"
-    font-family="-apple-system,sans-serif"
-    font-size="\${size*0.1}" fill="#aaaaaa">残り</text>
-</svg>\`;
+  for (let i = 0; i < STEPS; i++) {
+    const t = i / STEPS;                        // 0〜1
+    const ang0 = -Math.PI / 2 + t * 2 * Math.PI;
+    const ang1 = -Math.PI / 2 + (i + 1) / STEPS * 2 * Math.PI;
+    const mid  = (ang0 + ang1) / 2;
 
-  const data = Data.fromString(svg);
-  return Image.fromData(data);
+    // 経過分は赤〜オレンジ, 残り分はダーク
+    let col;
+    if (t < elapsed) {
+      const p  = elapsed > 0 ? t / elapsed : 0;
+      const rr = 255;
+      const gg = Math.round(107 + (165 - 107) * p);
+      const bb = Math.round(107 * (1 - p));
+      const hex = (n) => n.toString(16).padStart(2, "0");
+      col = new Color("#" + hex(rr) + hex(gg) + hex(bb));
+    } else {
+      col = new Color("#2a2a4a");
+    }
+
+    // 線分の始点・終点（外側〜内側）
+    const x0 = cx + (R - lw / 2) * Math.cos(mid);
+    const y0 = cy + (R - lw / 2) * Math.sin(mid);
+    const x1 = cx + (R + lw / 2) * Math.cos(mid);
+    const y1 = cy + (R + lw / 2) * Math.sin(mid);
+
+    const path = new Path();
+    path.move(new Point(x0, y0));
+    path.addLine(new Point(x1, y1));
+    dc.addPath(path);
+    dc.setStrokeColor(col);
+    dc.setLineWidth(size * 2 * Math.PI / STEPS + 1); // セグメント幅（隙間なし）
+    dc.strokePath();
+  }
+
+  // 中央テキスト: %
+  const pctStr = (remaining * 100).toFixed(1) + "%";
+  dc.setFont(Font.boldSystemFont(size * 0.17));
+  dc.setTextColor(new Color("#ffffff"));
+  dc.setTextAlignedCenter();
+  dc.drawTextInRect(pctStr, new Rect(0, cy - size * 0.14, size, size * 0.22));
+
+  dc.setFont(Font.systemFont(size * 0.11));
+  dc.setTextColor(new Color("#888888"));
+  dc.drawTextInRect("残り", new Rect(0, cy + size * 0.06, size, size * 0.18));
+
+  return dc.getImage();
 }
 
 // ===== ウィジェット構築 =====
@@ -244,7 +277,7 @@ w.backgroundGradient = grad;
 w.setPadding(8, 8, 8, 8);
 
 // 円グラフ
-const donutImg = drawDonutSVG(r.ratio, 160);
+const donutImg = drawDonut(r.ratio, 160);
 const imgStack = w.addStack();
 imgStack.layoutHorizontally();
 imgStack.addSpacer();
