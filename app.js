@@ -202,62 +202,38 @@ function calcRemaining(birth, targetAge) {
 const r = calcRemaining(BIRTH, TARGET_AGE);
 const pct = (r.ratio * 100).toFixed(2);
 
-// ===== 円グラフを DrawContext で描画 =====
-function drawDonut(remaining, size) {
-  const ctx = new DrawContext();
-  ctx.size = new Size(size, size);
-  ctx.opaque = false;
-  ctx.respectScreenScale = true;
-
-  const cx = size / 2, cy = size / 2;
-  const radius = size * 0.42;
-  const lw = size * 0.13;
+// ===== ドーナツグラフ: SVG文字列をbase64でImage化 =====
+function drawDonutSVG(remaining, size) {
+  const cx = size / 2;
+  const cy = size / 2;
+  const radius = size * 0.38;
+  const strokeW = size * 0.14;
+  const circ = 2 * Math.PI * radius;
   const elapsed = 1 - remaining;
+  const dashElapsed = circ * elapsed;
+  const dashRemain  = circ * remaining;
 
-  // 背景円
-  const bgPath = new Path();
-  bgPath.addArc(new Point(cx, cy), radius, 0, 2 * Math.PI);
-  ctx.setStrokeColor(new Color("#333355", 1));
-  ctx.setLineWidth(lw);
-  ctx.addPath(bgPath);
-  ctx.strokePath();
+  const svg = \`<svg xmlns="http://www.w3.org/2000/svg" width="\${size}" height="\${size}">
+  <circle cx="\${cx}" cy="\${cy}" r="\${radius}"
+    fill="none" stroke="#2a2a4a" stroke-width="\${strokeW}"/>
+  <circle cx="\${cx}" cy="\${cy}" r="\${radius}"
+    fill="none" stroke="#ff6b00" stroke-width="\${strokeW}"
+    stroke-dasharray="\${dashElapsed} \${dashRemain}"
+    stroke-dashoffset="\${circ * 0.25}"
+    stroke-linecap="round"/>
+  <text x="\${cx}" y="\${cy - size*0.04}" text-anchor="middle"
+    font-family="-apple-system,sans-serif" font-weight="bold"
+    font-size="\${size*0.17}" fill="#ffffff">\${(remaining*100).toFixed(1)}%</text>
+  <text x="\${cx}" y="\${cy + size*0.13}" text-anchor="middle"
+    font-family="-apple-system,sans-serif"
+    font-size="\${size*0.1}" fill="#aaaaaa">残り</text>
+</svg>\`;
 
-  // 経過分（赤〜オレンジ）- 複数の弧を重ねてグラデーション風に
-  const steps = 30;
-  for (let i = 0; i < steps; i++) {
-    const t = i / steps;
-    if (t >= elapsed) break;
-    const startAng = -Math.PI / 2 + t * 2 * Math.PI;
-    const endAng   = -Math.PI / 2 + (t + 1/steps) * 2 * Math.PI;
-    const r2 = Math.round(255);
-    const g2 = Math.round(107 + (165 - 107) * (t / elapsed));
-    const b2 = Math.round(107 * (1 - t / elapsed));
-    const arcPath = new Path();
-    arcPath.addArc(new Point(cx, cy), radius, startAng, endAng);
-    ctx.setStrokeColor(new Color(
-      "#" + r2.toString(16).padStart(2,"0")
-          + g2.toString(16).padStart(2,"0")
-          + b2.toString(16).padStart(2,"0"), 1));
-    ctx.setLineWidth(lw);
-    ctx.addPath(arcPath);
-    ctx.strokePath();
-  }
-
-  // 中央テキスト: %
-  const pctStr = (remaining * 100).toFixed(1) + "%";
-  ctx.setTextAlignedCenter();
-  ctx.setFont(Font.boldSystemFont(size * 0.16));
-  ctx.setTextColor(new Color("#ffffff"));
-  ctx.drawTextInRect(pctStr, new Rect(0, cy - size * 0.13, size, size * 0.22));
-
-  ctx.setFont(Font.systemFont(size * 0.1));
-  ctx.setTextColor(new Color("#aaaaaa"));
-  ctx.drawTextInRect("残り", new Rect(0, cy + size * 0.08, size, size * 0.16));
-
-  return ctx.getImage();
+  const data = Data.fromString(svg);
+  return Image.fromData(data);
 }
 
-// ===== Small ウィジェット =====
+// ===== ウィジェット構築 =====
 const w = new ListWidget();
 const grad = new LinearGradient();
 grad.colors = [new Color("#1a1a2e"), new Color("#0f0f1a")];
@@ -265,15 +241,15 @@ grad.locations = [0, 1];
 grad.startPoint = new Point(0, 0);
 grad.endPoint = new Point(1, 1);
 w.backgroundGradient = grad;
-w.setPadding(10, 10, 10, 10);
+w.setPadding(8, 8, 8, 8);
 
-// 円グラフ画像
-const donutImg = drawDonut(r.ratio, 160);
+// 円グラフ
+const donutImg = drawDonutSVG(r.ratio, 160);
 const imgStack = w.addStack();
 imgStack.layoutHorizontally();
 imgStack.addSpacer();
 const wImg = imgStack.addImage(donutImg);
-wImg.imageSize = new Size(80, 80);
+wImg.imageSize = new Size(90, 90);
 imgStack.addSpacer();
 
 w.addSpacer(4);
@@ -284,7 +260,7 @@ yearStack.layoutHorizontally();
 yearStack.addSpacer();
 const yearTxt = yearStack.addText(r.years + " 年");
 yearTxt.textColor = new Color("#ffa500");
-yearTxt.font = Font.boldSystemFont(15);
+yearTxt.font = Font.boldSystemFont(14);
 yearStack.addSpacer();
 
 // 残り日数
