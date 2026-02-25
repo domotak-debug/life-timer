@@ -201,112 +201,196 @@ function calcRemaining(birth, targetAge) {
 
 const r = calcRemaining(BIRTH, TARGET_AGE);
 const pct = (r.ratio * 100).toFixed(2);
+const BG = "#141425";
 
-// ===== DrawContext でドーナツグラフを描画 =====
-// Scriptable は Path.addArc / SVG 非対応のため
-// 細かい線分を並べてリング状の円を描く
-function drawDonut(remaining, size) {
-  const dc = new DrawContext();
-  dc.size = new Size(size, size);
-  dc.opaque = false;
-  dc.respectScreenScale = true;
+// ===== WebView 経由で円グラフ画像を生成 =====
+async function drawDonut(remaining, size) {
+  const elapsed = 1 - remaining;
+  const html = \`<html><body style="margin:0;background:transparent;">
+<canvas id="c" width="\${size}" height="\${size}"></canvas>
+<script>
+  var c = document.getElementById("c");
+  var ctx = c.getContext("2d");
+  var cx = \${size}/2, cy = \${size}/2;
+  var R = \${size}*0.38, lw = \${size}*0.13;
+  // 背景リング
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI*2);
+  ctx.strokeStyle = "#2a2a4a";
+  ctx.lineWidth = lw;
+  ctx.stroke();
+  // 経過分リング
+  var start = -Math.PI/2;
+  var end = start + Math.PI*2 * \${elapsed};
+  var grad = ctx.createConicGradient(start, cx, cy);
+  grad.addColorStop(0, "#ff6b6b");
+  grad.addColorStop(\${elapsed > 0 ? elapsed : 0.001}, "#ffa500");
+  grad.addColorStop(\${elapsed > 0 ? elapsed + 0.001 : 0.002}, "transparent");
+  grad.addColorStop(1, "transparent");
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, start, end);
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = lw;
+  ctx.lineCap = "round";
+  ctx.stroke();
+  // 中央テキスト
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "bold " + (\${size}*0.17) + "px -apple-system, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("\${(remaining*100).toFixed(1)}%", cx, cy - \${size}*0.03);
+  ctx.fillStyle = "#888888";
+  ctx.font = (\${size}*0.11) + "px -apple-system, sans-serif";
+  ctx.fillText("残り", cx, cy + \${size}*0.14);
+  // base64 出力
+  completion(c.toDataURL("image/png"));
+<\/script></body></html>\`;
 
-  const cx = size / 2;
-  const cy = size / 2;
-  const R  = size * 0.38;   // 円の半径
-  const lw = size * 0.12;   // 線の太さ
-  const STEPS = 120;        // 分割数（多いほど滑らか）
-  const elapsed = 1 - remaining; // 経過割合
-
-  for (let i = 0; i < STEPS; i++) {
-    const t = i / STEPS;                        // 0〜1
-    const ang0 = -Math.PI / 2 + t * 2 * Math.PI;
-    const ang1 = -Math.PI / 2 + (i + 1) / STEPS * 2 * Math.PI;
-    const mid  = (ang0 + ang1) / 2;
-
-    // 経過分は赤〜オレンジ, 残り分はダーク
-    let col;
-    if (t < elapsed) {
-      const p  = elapsed > 0 ? t / elapsed : 0;
-      const rr = 255;
-      const gg = Math.round(107 + (165 - 107) * p);
-      const bb = Math.round(107 * (1 - p));
-      const hex = (n) => n.toString(16).padStart(2, "0");
-      col = new Color("#" + hex(rr) + hex(gg) + hex(bb));
-    } else {
-      col = new Color("#2a2a4a");
-    }
-
-    // 線分の始点・終点（外側〜内側）
-    const x0 = cx + (R - lw / 2) * Math.cos(mid);
-    const y0 = cy + (R - lw / 2) * Math.sin(mid);
-    const x1 = cx + (R + lw / 2) * Math.cos(mid);
-    const y1 = cy + (R + lw / 2) * Math.sin(mid);
-
-    const path = new Path();
-    path.move(new Point(x0, y0));
-    path.addLine(new Point(x1, y1));
-    dc.addPath(path);
-    dc.setStrokeColor(col);
-    dc.setLineWidth(size * 2 * Math.PI / STEPS + 1); // セグメント幅（隙間なし）
-    dc.strokePath();
-  }
-
-  // 中央テキスト: %
-  const pctStr = (remaining * 100).toFixed(1) + "%";
-  dc.setFont(Font.boldSystemFont(size * 0.17));
-  dc.setTextColor(new Color("#ffffff"));
-  dc.setTextAlignedCenter();
-  dc.drawTextInRect(pctStr, new Rect(0, cy - size * 0.14, size, size * 0.22));
-
-  dc.setFont(Font.systemFont(size * 0.11));
-  dc.setTextColor(new Color("#888888"));
-  dc.drawTextInRect("残り", new Rect(0, cy + size * 0.06, size, size * 0.18));
-
-  return dc.getImage();
+  const wv = new WebView();
+  await wv.loadHTML(html);
+  const b64 = await wv.evaluateJavaScript(html.includes("completion") ? "void 0" : "void 0", true);
+  return b64;
 }
 
-// ===== ウィジェット構築 =====
-const w = new ListWidget();
-const grad = new LinearGradient();
-grad.colors = [new Color("#1a1a2e"), new Color("#0f0f1a")];
-grad.locations = [0, 1];
-grad.startPoint = new Point(0, 0);
-grad.endPoint = new Point(1, 1);
-w.backgroundGradient = grad;
-w.setPadding(8, 8, 8, 8);
+// 安全なフォールバック: WebView なしでテキストウィジェット
+function buildTextWidget(r, pct) {
+  const w = new ListWidget();
+  const grad = new LinearGradient();
+  grad.colors = [new Color("#1a1a2e"), new Color("#0f0f1a")];
+  grad.locations = [0, 1];
+  grad.startPoint = new Point(0, 0);
+  grad.endPoint = new Point(1, 1);
+  w.backgroundGradient = grad;
+  w.setPadding(12, 14, 12, 14);
 
-// 円グラフ
-const donutImg = drawDonut(r.ratio, 160);
-const imgStack = w.addStack();
-imgStack.layoutHorizontally();
-imgStack.addSpacer();
-const wImg = imgStack.addImage(donutImg);
-wImg.imageSize = new Size(90, 90);
-imgStack.addSpacer();
+  const title = w.addText("⏳ Life Timer");
+  title.textColor = new Color("#ff6b6b");
+  title.font = Font.boldSystemFont(12);
 
-w.addSpacer(4);
+  w.addSpacer(6);
 
-// 残り年数
-const yearStack = w.addStack();
-yearStack.layoutHorizontally();
-yearStack.addSpacer();
-const yearTxt = yearStack.addText(r.years + " 年");
-yearTxt.textColor = new Color("#ffa500");
-yearTxt.font = Font.boldSystemFont(14);
-yearStack.addSpacer();
+  const pctText = w.addText(pct + "%");
+  pctText.textColor = new Color("#ffffff");
+  pctText.font = Font.boldSystemFont(26);
 
-// 残り日数
-const dayStack = w.addStack();
-dayStack.layoutHorizontally();
-dayStack.addSpacer();
-const dayTxt = dayStack.addText(r.days.toLocaleString() + " 日");
-dayTxt.textColor = new Color("#cccccc");
-dayTxt.font = Font.systemFont(11);
-dayStack.addSpacer();
+  w.addSpacer(2);
 
-Script.setWidget(w);
-Script.complete();
+  const yearText = w.addText("残り " + r.years + " 年");
+  yearText.textColor = new Color("#ffa500");
+  yearText.font = Font.boldSystemFont(14);
+
+  const dayText = w.addText(r.days.toLocaleString() + " 日 / " + r.months.toLocaleString() + " ヶ月");
+  dayText.textColor = new Color("#cccccc");
+  dayText.font = Font.systemFont(11);
+
+  return w;
+}
+
+// ===== WebView で円グラフ画像を生成する安定版 =====
+async function createDonutImage(remaining, sz) {
+  const elapsed = 1 - remaining;
+  const pctLabel = (remaining * 100).toFixed(1) + "%";
+  const js = \`
+    const c = document.createElement("canvas");
+    c.width = \${sz}; c.height = \${sz};
+    document.body.appendChild(c);
+    const ctx = c.getContext("2d");
+    const cx = \${sz}/2, cy = \${sz}/2;
+    const R = \${sz}*0.38, lw = \${sz}*0.13;
+    // 背景リング
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI*2);
+    ctx.strokeStyle = "#2a2a4a";
+    ctx.lineWidth = lw;
+    ctx.stroke();
+    // 経過リング (赤→オレンジ)
+    const segs = 60;
+    const elapsedRatio = \${elapsed};
+    for (let i = 0; i < segs; i++) {
+      const t = i / segs;
+      if (t >= elapsedRatio) break;
+      const a0 = -Math.PI/2 + t * Math.PI*2;
+      const a1 = -Math.PI/2 + (i+1)/segs * Math.PI*2;
+      const p = elapsedRatio > 0 ? t / elapsedRatio : 0;
+      const rr = 255;
+      const gg = Math.round(107 + 58*p);
+      const bb = Math.round(107 * (1-p));
+      ctx.beginPath();
+      ctx.arc(cx, cy, R, a0, a1 + 0.02);
+      ctx.strokeStyle = "rgb("+rr+","+gg+","+bb+")";
+      ctx.lineWidth = lw;
+      ctx.lineCap = "round";
+      ctx.stroke();
+    }
+    // テキスト
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold " + (\${sz}*0.17) + "px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("\${pctLabel}", cx, cy - \${sz}*0.02);
+    ctx.fillStyle = "#888888";
+    ctx.font = (\${sz}*0.11) + "px sans-serif";
+    ctx.fillText("残り", cx, cy + \${sz}*0.15);
+    c.toDataURL("image/png");
+  \`;
+
+  const wv = new WebView();
+  await wv.loadHTML("<html><body></body></html>");
+  const dataUrl = await wv.evaluateJavaScript(js, false);
+  const b64 = dataUrl.replace(/^data:image\\/png;base64,/, "");
+  const imgData = Data.fromBase64String(b64);
+  return Image.fromData(imgData);
+}
+
+// ===== メイン (async) =====
+async function main() {
+  let w;
+  try {
+    const img = await createDonutImage(r.ratio, 200);
+    w = new ListWidget();
+    const grad = new LinearGradient();
+    grad.colors = [new Color("#1a1a2e"), new Color("#0f0f1a")];
+    grad.locations = [0, 1];
+    grad.startPoint = new Point(0, 0);
+    grad.endPoint = new Point(1, 1);
+    w.backgroundGradient = grad;
+    w.setPadding(8, 8, 8, 8);
+
+    const imgStack = w.addStack();
+    imgStack.layoutHorizontally();
+    imgStack.addSpacer();
+    const wImg = imgStack.addImage(img);
+    wImg.imageSize = new Size(90, 90);
+    imgStack.addSpacer();
+
+    w.addSpacer(4);
+
+    const yearStack = w.addStack();
+    yearStack.layoutHorizontally();
+    yearStack.addSpacer();
+    const yearTxt = yearStack.addText(r.years + " 年");
+    yearTxt.textColor = new Color("#ffa500");
+    yearTxt.font = Font.boldSystemFont(14);
+    yearStack.addSpacer();
+
+    const dayStack = w.addStack();
+    dayStack.layoutHorizontally();
+    dayStack.addSpacer();
+    const dayTxt = dayStack.addText(r.days.toLocaleString() + " 日");
+    dayTxt.textColor = new Color("#cccccc");
+    dayTxt.font = Font.systemFont(11);
+    dayStack.addSpacer();
+  } catch (e) {
+    // WebView が失敗した場合はテキスト版にフォールバック
+    w = buildTextWidget(r, pct);
+  }
+
+  Script.setWidget(w);
+  Script.complete();
+  w.presentSmall();
+}
+
+await main();
 `;
 }
 
