@@ -202,59 +202,124 @@ function calcRemaining(birth, targetAge) {
 const r = calcRemaining(BIRTH, TARGET_AGE);
 const pct = (r.ratio * 100).toFixed(2);
 
+// ===== 円グラフを DrawContext で描画 =====
+function drawDonut(remaining, size) {
+  const ctx = new DrawContext();
+  ctx.size = new Size(size, size);
+  ctx.opaque = false;
+  ctx.respectScreenScale = true;
+
+  const cx = size / 2, cy = size / 2;
+  const radius = size * 0.42;
+  const lw = size * 0.13;
+  const elapsed = 1 - remaining;
+
+  // 背景円
+  const bgPath = new Path();
+  bgPath.addArc(new Point(cx, cy), radius, 0, 2 * Math.PI);
+  ctx.setStrokeColor(new Color("#333355", 1));
+  ctx.setLineWidth(lw);
+  ctx.addPath(bgPath);
+  ctx.strokePath();
+
+  // 経過分（赤〜オレンジ）- 複数の弧を重ねてグラデーション風に
+  const steps = 30;
+  for (let i = 0; i < steps; i++) {
+    const t = i / steps;
+    if (t >= elapsed) break;
+    const startAng = -Math.PI / 2 + t * 2 * Math.PI;
+    const endAng   = -Math.PI / 2 + (t + 1/steps) * 2 * Math.PI;
+    const r2 = Math.round(255);
+    const g2 = Math.round(107 + (165 - 107) * (t / elapsed));
+    const b2 = Math.round(107 * (1 - t / elapsed));
+    const arcPath = new Path();
+    arcPath.addArc(new Point(cx, cy), radius, startAng, endAng);
+    ctx.setStrokeColor(new Color(
+      "#" + r2.toString(16).padStart(2,"0")
+          + g2.toString(16).padStart(2,"0")
+          + b2.toString(16).padStart(2,"0"), 1));
+    ctx.setLineWidth(lw);
+    ctx.addPath(arcPath);
+    ctx.strokePath();
+  }
+
+  // 中央テキスト: %
+  const pctStr = (remaining * 100).toFixed(1) + "%";
+  ctx.setTextAlignedCenter();
+  ctx.setFont(Font.boldSystemFont(size * 0.16));
+  ctx.setTextColor(new Color("#ffffff"));
+  ctx.drawTextInRect(pctStr, new Rect(0, cy - size * 0.13, size, size * 0.22));
+
+  ctx.setFont(Font.systemFont(size * 0.1));
+  ctx.setTextColor(new Color("#aaaaaa"));
+  ctx.drawTextInRect("残り", new Rect(0, cy + size * 0.08, size, size * 0.16));
+
+  return ctx.getImage();
+}
+
+// ===== Small ウィジェット =====
 const w = new ListWidget();
-w.backgroundColor = new Color("#0f0f1a");
-w.setPadding(12, 14, 12, 14);
+const grad = new LinearGradient();
+grad.colors = [new Color("#1a1a2e"), new Color("#0f0f1a")];
+grad.locations = [0, 1];
+grad.startPoint = new Point(0, 0);
+grad.endPoint = new Point(1, 1);
+w.backgroundGradient = grad;
+w.setPadding(10, 10, 10, 10);
 
-// グラデーションタイトル
-const titleStack = w.addStack();
-const title = titleStack.addText("⏳ Life Timer");
-title.textColor = new Color("#ff6b6b");
-title.font = Font.boldSystemFont(13);
+// 円グラフ画像
+const donutImg = drawDonut(r.ratio, 160);
+const imgStack = w.addStack();
+imgStack.layoutHorizontally();
+imgStack.addSpacer();
+const wImg = imgStack.addImage(donutImg);
+wImg.imageSize = new Size(80, 80);
+imgStack.addSpacer();
 
-w.addSpacer(8);
-
-// 残り %
-const pctText = w.addText(pct + "%");
-pctText.textColor = new Color("#ffffff");
-pctText.font = Font.boldSystemFont(28);
+w.addSpacer(4);
 
 // 残り年数
-const yearText = w.addText("残り " + r.years + " 年");
-yearText.textColor = new Color("#aaaaaa");
-yearText.font = Font.systemFont(12);
+const yearStack = w.addStack();
+yearStack.layoutHorizontally();
+yearStack.addSpacer();
+const yearTxt = yearStack.addText(r.years + " 年");
+yearTxt.textColor = new Color("#ffa500");
+yearTxt.font = Font.boldSystemFont(15);
+yearStack.addSpacer();
 
-w.addSpacer(6);
-
-// 残り日数・月数
-const daysText = w.addText(r.days.toLocaleString() + " 日");
-daysText.textColor = new Color("#ffa500");
-daysText.font = Font.boldSystemFont(15);
-
-const monthsText = w.addText(r.months.toLocaleString() + " ヶ月");
-monthsText.textColor = new Color("#cccccc");
-monthsText.font = Font.systemFont(11);
+// 残り日数
+const dayStack = w.addStack();
+dayStack.layoutHorizontally();
+dayStack.addSpacer();
+const dayTxt = dayStack.addText(r.days.toLocaleString() + " 日");
+dayTxt.textColor = new Color("#cccccc");
+dayTxt.font = Font.systemFont(11);
+dayStack.addSpacer();
 
 Script.setWidget(w);
 Script.complete();
 `;
 }
 
-function copyScriptable() {
+function copyScriptable(statusId = 'copyStatus') {
   const code = getScriptableCode();
+  const showStatus = (id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.textContent = '✅ コピーしました！Scriptable に貼り付けてください';
+      setTimeout(() => el.textContent = '', 4000);
+    }
+  };
   navigator.clipboard.writeText(code).then(() => {
-    const status = document.getElementById('copyStatus');
-    status.textContent = '✅ コピーしました！Scriptable に貼り付けてください';
-    setTimeout(() => status.textContent = '', 4000);
+    showStatus(statusId);
   }).catch(() => {
-    // フォールバック
     const ta = document.createElement('textarea');
     ta.value = code;
     document.body.appendChild(ta);
     ta.select();
     document.execCommand('copy');
     document.body.removeChild(ta);
-    document.getElementById('copyStatus').textContent = '✅ コピーしました！';
+    showStatus(statusId);
   });
 }
 

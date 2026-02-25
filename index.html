@@ -104,17 +104,30 @@
         </div>
       </div>
 
-      <!-- Scriptable ウィジェット案内 -->
+      <!-- iPhone Scriptable ウィジェット案内 -->
       <div class="card widget-guide">
-        <h2 class="card-title">📱 ウィジェットの追加方法</h2>
+        <h2 class="card-title">📱 iPhone ウィジェット（円グラフ付き）</h2>
         <ol class="guide-steps">
           <li>App Store で <strong>「Scriptable」</strong> を無料インストール</li>
           <li>Scriptable を開き「+」でスクリプト追加</li>
-          <li>下のコードをコピーして貼り付け</li>
-          <li>ホーム画面でウィジェット追加 → Scriptable を選択</li>
+          <li>下のコードをコピーして貼り付け・保存</li>
+          <li>ホーム画面長押し → 「+」→ Scriptable → ウィジェット追加</li>
         </ol>
-        <button class="copy-btn" onclick="copyScriptable()">Scriptable コードをコピー</button>
+        <button class="copy-btn" onclick="copyScriptable()">📋 Scriptable コードをコピー</button>
         <span class="copy-status" id="copyStatus"></span>
+      </div>
+
+      <!-- Mac ウィジェット案内 -->
+      <div class="card widget-guide">
+        <h2 class="card-title">💻 Mac ウィジェット</h2>
+        <ol class="guide-steps">
+          <li>Mac App Store で <strong>「Scriptable」</strong> を無料インストール</li>
+          <li>iPhone と同じコードを Scriptable (Mac) に貼り付け</li>
+          <li>通知センター（右上から左スワイプ）→ 下にスクロール → 「編集」</li>
+          <li>Scriptable を追加 → スクリプトを選択</li>
+        </ol>
+        <button class="copy-btn" onclick="copyScriptable('copyStatusMac')">📋 Mac 用コードをコピー（同じ）</button>
+        <span class="copy-status" id="copyStatusMac"></span>
       </div>
     </main>
   </div>

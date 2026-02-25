@@ -3,6 +3,7 @@
   "short_name": "Life Timer",
   "description": "残りの寿命を可視化するアプリ",
   "start_url": "/life-timer/",
+  "scope": "/life-timer/",
   "display": "standalone",
   "background_color": "#0f0f1a",
   "theme_color": "#0f0f1a",
