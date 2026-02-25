@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Icon Generator</title></head>
+<body>
+<canvas id="c192" width="192" height="192" style="display:none"></canvas>
+<canvas id="c512" width="512" height="512" style="display:none"></canvas>
+<canvas id="c180" width="180" height="180" style="display:none"></canvas>
+<script>
+function drawIcon(canvas, size) {
+  const ctx = canvas.getContext('2d');
+  const s = size;
+
+  // 背景
+  const grad = ctx.createLinearGradient(0,0,s,s);
+  grad.addColorStop(0, '#1a1a2e');
+  grad.addColorStop(1, '#0f0f1a');
+  ctx.fillStyle = grad;
+  roundRect(ctx, 0, 0, s, s, s * 0.22);
+  ctx.fill();
+
+  // 外円 (暗い)
+  ctx.beginPath();
+  ctx.arc(s/2, s/2, s*0.38, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = s * 0.07;
+  ctx.stroke();
+
+  // プログレス弧 (約45% 残り)
+  const grad2 = ctx.createLinearGradient(0,0,s,0);
+  grad2.addColorStop(0, '#ff6b6b');
+  grad2.addColorStop(1, '#ffa500');
+  ctx.beginPath();
+  ctx.arc(s/2, s/2, s*0.38, -Math.PI/2, -Math.PI/2 + Math.PI*2*0.55);
+  ctx.strokeStyle = grad2;
+  ctx.lineWidth = s * 0.07;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // テキスト "⏳"
+  ctx.font = `${s*0.32}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('⏳', s/2, s/2);
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y);
+  ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r);
+  ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h);
+  ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r);
+  ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
+
+const sizes = [{id:'c192',size:192,name:'icon-192.png'},{id:'c512',size:512,name:'icon-512.png'},{id:'c180',size:180,name:'icon-180.png'}];
+sizes.forEach(({id,size,name}) => {
+  const c = document.getElementById(id);
+  drawIcon(c, size);
+  const a = document.createElement('a');
+  a.download = name;
+  a.href = c.toDataURL('image/png');
+  a.textContent = name + ' をダウンロード';
+  a.style.display='block';
+  a.style.margin='8px';
+  document.body.appendChild(a);
+});
+document.body.insertAdjacentHTML('afterbegin','<p style="font-family:sans-serif;padding:8px">以下のリンクをクリックしてアイコンをダウンロードし、icons/ フォルダに入れてください:</p>');
+</script>
+</body>
+</html>

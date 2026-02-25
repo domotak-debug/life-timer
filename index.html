@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Life Timer">
+  <meta name="theme-color" content="#1a1a2e">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <title>Life Timer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- ヘッダー -->
+    <header class="header">
+      <h1>Life Timer</h1>
+      <button class="settings-btn" onclick="openSettings()" aria-label="設定">⚙️</button>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="main">
+      <!-- 年齢表示 -->
+      <div class="age-display">
+        <span class="age-label">現在の年齢</span>
+        <span class="age-value" id="ageString">--歳 --ヶ月 --日</span>
+      </div>
+
+      <!-- 円形プログレス -->
+      <div class="circle-container">
+        <svg class="progress-ring" viewBox="0 0 220 220">
+          <defs>
+            <linearGradient id="progressGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" style="stop-color:#ff6b6b"/>
+              <stop offset="100%" style="stop-color:#ffa500"/>
+            </linearGradient>
+          </defs>
+          <!-- 背景円 -->
+          <circle class="ring-bg" cx="110" cy="110" r="95"/>
+          <!-- プログレス円 -->
+          <circle class="ring-progress" id="progressCircle" cx="110" cy="110" r="95"/>
+        </svg>
+        <div class="circle-text">
+          <span class="remaining-label">残り</span>
+          <span class="remaining-percent" id="remainingPercent">--.----%</span>
+          <span class="remaining-years" id="remainingYears">-- 年</span>
+        </div>
+      </div>
+
+      <!-- カウントダウン内訳 -->
+      <div class="card countdown-card">
+        <h2 class="card-title">残り時間の内訳</h2>
+        <div class="countdown-grid" id="countdownGrid">
+          <div class="cd-unit"><span class="cd-value" id="cd-years">--</span><span class="cd-label">年</span></div>
+          <div class="cd-sep">:</div>
+          <div class="cd-unit"><span class="cd-value" id="cd-months">--</span><span class="cd-label">月</span></div>
+          <div class="cd-sep">:</div>
+          <div class="cd-unit"><span class="cd-value" id="cd-days">--</span><span class="cd-label">日</span></div>
+          <div class="cd-sep">:</div>
+          <div class="cd-unit"><span class="cd-value" id="cd-hours">--</span><span class="cd-label">時</span></div>
+          <div class="cd-sep">:</div>
+          <div class="cd-unit"><span class="cd-value" id="cd-minutes">--</span><span class="cd-label">分</span></div>
+          <div class="cd-sep">:</div>
+          <div class="cd-unit"><span class="cd-value" id="cd-seconds">--</span><span class="cd-label">秒</span></div>
+        </div>
+      </div>
+
+      <!-- 残り単位別 -->
+      <div class="card">
+        <h2 class="card-title">残り時間（合計換算）</h2>
+        <div class="units-grid">
+          <div class="unit-card">
+            <span class="unit-icon">📅</span>
+            <span class="unit-value" id="u-months">--</span>
+            <span class="unit-label">ヶ月</span>
+          </div>
+          <div class="unit-card">
+            <span class="unit-icon">📆</span>
+            <span class="unit-value" id="u-weeks">--</span>
+            <span class="unit-label">週間</span>
+          </div>
+          <div class="unit-card">
+            <span class="unit-icon">☀️</span>
+            <span class="unit-value" id="u-days">--</span>
+            <span class="unit-label">日</span>
+          </div>
+          <div class="unit-card">
+            <span class="unit-icon">🕐</span>
+            <span class="unit-value" id="u-hours">--</span>
+            <span class="unit-label">時間</span>
+          </div>
+          <div class="unit-card">
+            <span class="unit-icon">⏱️</span>
+            <span class="unit-value" id="u-minutes">--</span>
+            <span class="unit-label">分</span>
+          </div>
+          <div class="unit-card">
+            <span class="unit-icon">⚡</span>
+            <span class="unit-value" id="u-seconds">--</span>
+            <span class="unit-label">秒</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scriptable ウィジェット案内 -->
+      <div class="card widget-guide">
+        <h2 class="card-title">📱 ウィジェットの追加方法</h2>
+        <ol class="guide-steps">
+          <li>App Store で <strong>「Scriptable」</strong> を無料インストール</li>
+          <li>Scriptable を開き「+」でスクリプト追加</li>
+          <li>下のコードをコピーして貼り付け</li>
+          <li>ホーム画面でウィジェット追加 → Scriptable を選択</li>
+        </ol>
+        <button class="copy-btn" onclick="copyScriptable()">Scriptable コードをコピー</button>
+        <span class="copy-status" id="copyStatus"></span>
+      </div>
+    </main>
+  </div>
+
+  <!-- 設定モーダル -->
+  <div class="modal-overlay" id="settingsModal" onclick="closeSettingsOnOverlay(event)">
+    <div class="modal">
+      <h2>設定</h2>
+      <div class="form-group">
+        <label for="birthInput">生年月日</label>
+        <input type="date" id="birthInput" max="">
+      </div>
+      <div class="form-group">
+        <label for="targetAgeInput">目標寿命: <span id="targetAgeDisplay">80</span> 歳</label>
+        <input type="range" id="targetAgeInput" min="1" max="120" value="80"
+               oninput="document.getElementById('targetAgeDisplay').textContent=this.value">
+      </div>
+      <div class="modal-preview" id="modalPreview"></div>
+      <div class="modal-buttons">
+        <button class="btn-cancel" onclick="closeSettings()">キャンセル</button>
+        <button class="btn-save" onclick="saveSettings()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
